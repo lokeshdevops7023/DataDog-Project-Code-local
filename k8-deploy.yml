@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: venu-hamesh-urmila-deployment
   labels:
     app: nginx
 spec:
-  replicas: 3 # Desired number of Pod replicas
+  replicas: 15 # Desired number of Pod replicas
   selector:
     matchLabels:
       app: nginx
