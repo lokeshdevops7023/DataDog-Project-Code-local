@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda to clean unused SGs and EBS volumes
+
+Resources:
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CleanupLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CleanupPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DeleteSecurityGroup
+                  - ec2:DescribeVolumes
+                  - ec2:DeleteVolume
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  CleanupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CleanupUnusedResources
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import boto3
+          ec2 = boto3.client('ec2')
+
+          def lambda_handler(event, context):
+
+              # Delete unused Security Groups
+              sgs = ec2.describe_security_groups()
+              for sg in sgs['SecurityGroups']:
+                  group_id = sg['GroupId']
+                  group_name = sg['GroupName']
+
+                  if group_name == 'default':
+                      continue
+
+                  try:
+                      ec2.delete_security_group(GroupId=group_id)
+                      print(f"Deleted SG: {group_id}")
+                  except Exception as e:
+                      print(f"Skipping SG {group_id}: {e}")
+
+              # Delete unused EBS volumes
+              volumes = ec2.describe_volumes(
+                  Filters=[{'Name': 'status', 'Values': ['available']}]
+              )
+
+              for vol in volumes['Volumes']:
+                  try:
+                      ec2.delete_volume(VolumeId=vol['VolumeId'])
+                      print(f"Deleted Volume: {vol['VolumeId']}")
+                  except Exception as e:
+                      print(f"Error deleting volume: {e}")
+
+              return "Cleanup Completed"
+owner = harish 
+support = raju 
+viewer = lokesh
